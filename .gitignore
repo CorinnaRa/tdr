@@ -1,3 +1,6 @@
 *.pyc
 *.swp
 *.pickle
+.project
+.pydevproject
+img/

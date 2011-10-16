@@ -37,7 +37,7 @@ def merge_touches(touches):
         nxt = touches[i+1]
         if abs(cur[Touch.POSITION] - nxt[Touch.POSITION]) < min_touch_dist:
             to_merge.append(nxt)
-        else: 
+        else:
             if len(to_merge) == 1:
                 merged.append(to_merge[0])
             else:
@@ -58,7 +58,7 @@ def merge_touches(touches):
                     merged.append((pos, percentage, acc/len(to_merge)))
             to_merge = [touches[i+1]]
     return merged
-    
+
 def drawGrid(image):
     pts = []
     #vertical
@@ -75,7 +75,7 @@ def drawGrid(image):
         cv.Line(image, (display[0],0), (display[0],480), (0,255,0))
         cv.Line(image, (display[1],0), (display[1],480), (0,0,255))
     #threshold
-    cv.Line(image, (0,240+threshold), (640,240+threshold), (128,128,128))
+    cv.Line(image, (0,240+thresholdStart), (640,240+thresholdEnd), (128,128,128))
 
 def analyzeImage(image, mask):
     trace = []
@@ -108,30 +108,32 @@ def on_mouse(event, x, y, flags, param):
     if event == cv.CV_EVENT_LBUTTONUP:
         if x > display[0]: display[1] = x
     if event == cv.CV_EVENT_RBUTTONDOWN:
-        threshold = y - 240
-        print "threshold" + str(threshold)
+        thresholdStart = y - 240
+        thresholdEnd = y - 240
+        print "threshold" + str(thresholdStart)
 
 def autorange(calibrated):
     first = 0
     last = 640
     for i in range(0,640):
         #find first silence
-        if calibrated[i] > threshold / 5:
+        if calibrated[i] > threshold[i] / 5:
             first = i
         if i > first + 100:
             break
     first = first + 10
     for i in range(first,640):
         #find last silence
-        if calibrated[i] > threshold / 5:
+        if calibrated[i] > threshold[i] / 5:
             last = i
             break
     last = last - 10
     display[0] = first
-    display[1] = last 
+    display[1] = last
 
 ####################### START #####################
 
+threshold = zeros(640)
 shot = 0
 pause = 0
 grid = 1
@@ -150,15 +152,16 @@ app = QtGui.QApplication(sys.argv)
 if len(sys.argv) > 1:
     mode = sys.argv[1]
     demo = eval("demos." + mode.capitalize() + "()")
-else: 
+else:
     mode = "analyze"
     demo = None
 
 
 # load settings
 
-DEFAULTS = { 
-    "threshold"           : 50,
+DEFAULTS = {
+    "thresholdStart"      : 50,
+    "thresholdEnd"        : 50,
     "display"             : [30,600],
     "alteration_average"  : 30,
     "derivative_average"  : 30,
@@ -181,30 +184,48 @@ else:
 #    source = ImageSource.ImageSource(sys.argv[1])
 #else:
 #    source = VideoSource.VideoSource()
-source = VideoSource.VideoSource()
+#source = VideoSource.VideoSource()
+source = ImageSource.ImageSource()
 
 imageColor = cv.CreateImage([640,480], cv.IPL_DEPTH_8U, 3)
 
 #Global
 display=settings["display"]
 
-threshold = settings["threshold"]
-def change_threshold(val):
-    global threshold 
-    threshold = val
-cv.CreateTrackbar("threshold", "Settings", threshold, 100, change_threshold)
+thresholdStart = settings["thresholdStart"]
+def change_thresholdStart(val):
+    global thresholdStart
+    global thresholdEnd
+    global threshold
+    thresholdStart = val
+    for i in range(0,640):
+        threshold[i] = thresholdStart + (i / float(640)) * (thresholdEnd - thresholdStart)
+    print str(thresholdStart) + " - " + str(thresholdEnd)  + " - " + str(threshold[320])
+cv.CreateTrackbar("thresholdStart", "Settings", thresholdStart, 100, change_thresholdStart)
+
+thresholdEnd = settings["thresholdEnd"]
+def change_thresholdEnd(val):
+    global thresholdEnd
+    global thresholdStart
+    global threshold
+    thresholdEnd = val
+    for i in range(0,640):
+        threshold[i] = thresholdStart + (i / float(640)) * (thresholdEnd - thresholdStart)
+cv.CreateTrackbar("thresholdEnd", "Settings", thresholdEnd, 100, change_thresholdEnd)
+
+change_thresholdStart(thresholdStart)
 
 alteration_average = settings["alteration_average"]
 def change_alteration_average(val):
-    global alteration_average 
+    global alteration_average
     alteration_average = val+1
 cv.CreateTrackbar("alteration_average", "Settings", alteration_average, 50, change_alteration_average)
 
-time_average = settings["time_average"] 
+time_average = settings["time_average"]
 def change_time_average(val):
     global time_average
-    global history 
-    time_average = val+2 
+    global history
+    time_average = val+2
     history = zeros([time_average,640])
 cv.CreateTrackbar("time_average", "Settings", time_average, 50, change_time_average)
 
@@ -264,53 +285,53 @@ while True:
     #CAPTURE
     old_time = new_time
     img = source.next()
-    
+
     if pause == 0:
         cv.CvtColor(img, imageColor, cv.CV_GRAY2RGB)
-        
+
         #GRID
         if grid != 0: drawGrid(imageColor)
-        
+
         #ANALYZE
         x,trace = analyzeImage(img, pixelmask)
         if x.size < 2:
             x = array([0,640])
             trace = zeros(2)
         f = interpolate.interp1d(x, trace, bounds_error = 0, fill_value = 0)
-            
-        xa = arange(0,640) 
+
+        xa = arange(0,640)
         interpolated = f(xa)
-        
+
         #moving average - use a kernel with equal weights
         avg = signal.fftconvolve(interpolated, kernel(trace_average), mode='same')
-        
+
         #time average
         history = roll(history, -1, 0)
         history[-1] = interpolated
 
         alterationSpeed = abs(history[-1] - history[-2])
         alterationSpeed = signal.fftconvolve(alterationSpeed, ones(alteration_average)/alteration_average, mode='same')
-        
-        maskAlteration = where(alterationSpeed > threshold / 3, 1, 0)
+
+        maskAlteration = where(alterationSpeed > thresholdStart / 3, 1, 0)
         maskStatic = where(maskAlteration, 0, 1)
-        
+
         maskAlteration = signal.fftconvolve(maskAlteration, kernel(mask_average), mode='same')
         maskStatic = signal.fftconvolve(maskStatic, kernel(mask_average), mode='same')
 
         history = history * maskStatic + avg*maskAlteration
-        
+
         filtered = average(history,0)
-        
-        
+
+
         #derivative = misc.derivative(f, xa)
         #derivative = signal.fftconvolve(discreteDerivative(filtered), mav3kernel, mode='same')
-        
+
         #CALIBRATION
         calibrated = filtered - calibration
-        
+
         #derivative
         derivative = signal.fftconvolve(discreteDerivative(calibrated)*derivative_average, kernel(derivative_average), mode='same')
-            
+
         #correlate
         #correlation = signal.correlate(calibrated, corrSample, mode='same')
 
@@ -330,11 +351,11 @@ while True:
                     else:
                         det_val = 0
                     detected.append((det_pos,det_percentage,det_val))
-                    cv.Rectangle(imageColor, (int(det_pos-averaging_width/2),240), (int(det_pos+averaging_width/2),240+det_val), (255,125,125), cv.CV_FILLED) 
+                    cv.Rectangle(imageColor, (int(det_pos-averaging_width/2),240), (int(det_pos+averaging_width/2),240+det_val), (255,125,125), cv.CV_FILLED)
                     averaging_start = averaging_end
             elif detection_mode == MODE_SINGLEWIRE:
                 for i in range(display[0], display[1]):
-                    if (calibrated[i] > threshold): #or (derivative[i] >= 0 and derivative[i+1] < 0)
+                    if (calibrated[i] > threshold[i]): #or (derivative[i] >= 0 and derivative[i+1] < 0)
                         percentage = float(i - display[0]) / float(display[1] - display[0])
                         detected.append((i, percentage, calibrated[i]))
                         detected_history = roll(detected_history, -1, 0)
@@ -364,17 +385,17 @@ while True:
                     cv.Line(imageColor, (single_avg,0), (single_avg,480), (255,255,255))
             else: # touches mode
                 for i in range(display[0], display[1]):
-                    if ((calibrated[i] > threshold) and ((derivative[i] > 0 and derivative[i+1] <= 0))): 
+                    if ((calibrated[i] > threshold[i]) and ((derivative[i] > 0 and derivative[i+1] <= 0))):
                         # draw a lighter line for touches that are later filtered out
-                        cv.Line(imageColor, (i,0), (i,480), (125,125,125)) 
+                        cv.Line(imageColor, (i,0), (i,480), (125,125,125))
                         percentage = float(i - display[0]) / float(display[1] - display[0])
                         detected.append((i, percentage, calibrated[i]))
-                        if max_touches < 100: 
+                        if max_touches < 100:
                             detected.sort(key=lambda t: t[2], reverse = True)
                             detected = detected[:max_touches]
                 for touch in detected:
                     cv.Line(imageColor, (touch[Touch.POSITION],0), (touch[Touch.POSITION],480), (255,255,255))
-        
+
 
         # remove erroneous touches
         # maximum of n touches, (merge similar touches), etc.
@@ -398,7 +419,7 @@ while True:
             #printTrace(alterationSpeed, imageColor, (255,0,0), display, shift=300)
             #printTrace(maskAlteration, imageColor, (255,0,0), display, shift=300, scale=100)
             #printTrace(sc, imageColor, (255,0,0), display, shift=240, scale=300)
-        
+
         for i in markers:
             cv.Line(imageColor, (i,0), (i,480), (75,75,150))
         if recording:
@@ -406,12 +427,12 @@ while True:
             cv.SaveImage(video_filebase + "_raw_%06d.png" % (frame_counter), img)
             frame_counter += 1
             cv.Circle(imageColor, (610, 30), 10, (0,0,255),-1)
-        
+
         #SHOW
         cv.ShowImage("TDR",imageColor)
 
         process_touches(detected[:]) # pass a shallow copy
-        
+
     #autoCalibrate
     calibrationTimer += 1
     if calibrationTimer == 30:
@@ -421,7 +442,7 @@ while True:
         # autorange(calibrated)
         traces = 1
         detection = 1
-        
+
     #SIGNALS
     key = cv.WaitKey(7)
     key &= 1048575
@@ -465,11 +486,11 @@ while True:
             settings[setting] = eval(setting)
         print settings
         pickle.dump(settings,open(mode + ".pickle","w"))
-    if key == ord('l'): # load 
+    if key == ord('l'): # load
         settings = pickle.load(open(mode + ".pickle","r"))
         for setting in settings:
             exec(setting + ' = settings["'+ setting + '"]')
-            #exec('cv.SetTrackbarPos("' + setting + '","Settings", settings["' + setting + '"])') 
+            #exec('cv.SetTrackbarPos("' + setting + '","Settings", settings["' + setting + '"])')
     if key == ord('r'):
         recording = not recording
         if recording:
@@ -495,7 +516,7 @@ while True:
         else: pause = 1
         print "Pause: " + str(pause)
     if key == 9:        #tab
-        #if topicName == "": 
+        #if topicName == "":
         #tn, ok = QtGui.QInputDialog.getText(None, "Name fuer Screenshots", "Thema")
         #if ok:
         #    topicName = str(tn)
@@ -515,6 +536,6 @@ while True:
     # ensure max 20 fps
     if timediff.seconds == 0 and timediff.microseconds < 50000:
         time.sleep((50000.0 - timediff.microseconds) / 1000000.0)
-    
+
 #Release & Destroy
 cv.DestroyAllWindows()
