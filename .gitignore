@@ -3,4 +3,4 @@
 *.pickle
 .project
 .pydevproject
-img/
+img/*
