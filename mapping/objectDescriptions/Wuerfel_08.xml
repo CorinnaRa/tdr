@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<tdrObject>
+	<name>Würfel 08 (3cm-Würfel mit Kupferfolie 8mm)</name>
+	<objectBoundary>
+		<draw>100</draw>
+		<turnZ>90</turnZ>
+		<draw>300</draw>
+		<turnZ>90</turnZ>
+		<draw>100</draw>
+		<turnZ>90</turnZ>
+		<draw>300</draw>
+		<turnZ>180</turnZ>
+		<move>100</move>
+		<turnZ>-90</turnZ>
+		<draw>100</draw>
+		<turnZ>90</turnZ>
+		<move>100</move>
+		<turnZ>90</turnZ>
+		<draw>200</draw>
+		<turnZ>-90</turnZ>
+		<draw>400</draw>
+		<turnZ>-90</turnZ>
+		<draw>100</draw>
+		<turnZ>-90</turnZ>
+		<draw>300</draw>
+		<turnZ>-90</turnZ>
+		<draw>100</draw>
+		<turnZ>-90</turnZ>
+		<move>100</move>
+		<turnZ>-90</turnZ>
+		<draw>100</draw>
+		<turnZ>90</turnZ>
+		<move>100</move>
+		<turnZ>90</turnZ>
+		<draw>100</draw>
+	</objectBoundary>
+	<conductivePath>
+	</conductivePath>
+</tdrObject>

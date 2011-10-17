@@ -12,6 +12,8 @@ import pickle
 import sys
 from PyQt4 import QtGui
 
+from mapping.mapping_ui import MappingWindow
+
 import VideoSource
 import ImageSource
 
@@ -149,6 +151,9 @@ window = cv.NamedWindow("Settings", cv.CV_WINDOW_AUTOSIZE)
 cv.SetMouseCallback("TDR", on_mouse,0)
 app = QtGui.QApplication(sys.argv)
 
+dialog = MappingWindow()
+dialog.show()
+
 if len(sys.argv) > 1:
     mode = sys.argv[1]
     demo = eval("demos." + mode.capitalize() + "()")
@@ -200,7 +205,6 @@ def change_thresholdStart(val):
     thresholdStart = val
     for i in range(0,640):
         threshold[i] = thresholdStart + (i / float(640)) * (thresholdEnd - thresholdStart)
-    print str(thresholdStart) + " - " + str(thresholdEnd)  + " - " + str(threshold[320])
 cv.CreateTrackbar("thresholdStart", "Settings", thresholdStart, 100, change_thresholdStart)
 
 thresholdEnd = settings["thresholdEnd"]
